@@ -43,7 +43,7 @@ func main() {
 	start := time.Now()
 
 	var config = parseConfig()
-	fmt.Printf("EnvMap: %v\n", config)
+	fmt.Printf("Config: %v\n", config)
 
 	config.client = &http.Client{}
 
@@ -395,11 +395,12 @@ func downloadRepo(repo Repo, onFile func(fr FileRecord), config Config) {
 		group, ok := config.includeExtMap[ext]
 		if ok {
 			zfLines := countLines(string(buf))
-			onFile(FileRecord{
+			record := FileRecord{
 				Ext:        group,
 				RepoName:   repo.Name,
 				LinesCount: zfLines,
-			})
+			}
+			onFile(record)
 		}
 	}
 }
@@ -446,44 +447,48 @@ func countLines(data string) int64 {
 
 func printTable(m map[string]int64, metric string) {
 	type Pair = struct {
-		string
-		int64
+		left  string
+		right int64
 	}
 
 	pairs := make([]Pair, 0)
-
 	var total int64
+	maxKeyLen := 22
+
 	for k, v := range m {
+		if len(k) > maxKeyLen {
+			maxKeyLen = len(k)
+		}
 		total += v
 		pairs = append(pairs, Pair{k, v})
 	}
 
 	sort.Slice(pairs, func(i, j int) bool {
-		return pairs[i].int64 > pairs[j].int64
+		return pairs[i].right > pairs[j].right
 	})
 
 	for _, pair := range pairs {
-		key := pair.string
+		key := pair.left
 		if key == "" {
 			key = "<none>"
 		}
-		val := pair.int64
+		val := pair.right
 
 		percentage := float64(val) / float64(total) * 100
 
-		_, err := color.New(color.FgCyan).Printf("%22s", key)
+		_, err := color.New(color.FgCyan).Printf("%*s", maxKeyLen, key)
 		if err != nil {
 			fmt.Printf("%s\n", err.Error())
 			os.Exit(1)
 		}
-		_, err = color.New(color.FgMagenta).Printf("%8d %s", val, metric)
+		_, err = color.New(color.FgMagenta).Printf("%10d %s", val, metric)
 		if err != nil {
 			fmt.Printf("%s\n", err.Error())
 			os.Exit(1)
 		}
 
 		percentStr := fmt.Sprintf("%.2f", percentage)
-		_, err = color.New(color.FgGreen).Printf("%8s%% \t", percentStr)
+		_, err = color.New(color.FgGreen).Printf("%10s%% \t", percentStr)
 		if err != nil {
 			fmt.Printf("%s\n", err.Error())
 			os.Exit(1)
